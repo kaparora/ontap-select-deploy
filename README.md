@@ -1,5 +1,6 @@
 # ontap-select-deploy
-This program talks to the NetApp ONTAP Select Install VM using REST API and deplys a new ONTAP Cluster in a VMware environment
+This program talks to the NetApp ONTAP Select Install VM using REST API and deploys a new ONTAP Cluster
+
 ## Step1:
 Edit the config file ontap_select.cfg to setup your deployment config
 ## Step 2:

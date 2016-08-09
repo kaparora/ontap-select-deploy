@@ -1,3 +1,21 @@
+#!/usr/bin/env python
+"""
+This is the main python script for our Ontap Select Deployment.
+This script will read the ontap_select.cfg and perform create cluster and destroy cluster
+operations.
+Create clsuter workflow:
+1) Add hosts
+2) Configure Hosts
+3) Add Cluster
+Destroy cluster workflow:
+1) Stop all nodes
+2) offline Cluster
+3) Delete cluster
+4) Delete Hosts
+
+Author: Kapil Arora
+Github: @kapilarora
+"""
 import ConfigParser
 from ontap_select import OntapSelect
 import io

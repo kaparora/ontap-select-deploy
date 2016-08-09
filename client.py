@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+"""
+Class WebServiceClient talks to a RESTful service and sends
+Get, Put, Post and Delete requests
+Author: Kapil Arora
+Github: @kapilarora
+"""
 import requests
 import json
 import logging

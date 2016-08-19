@@ -110,8 +110,8 @@ def destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time):
     '''
     logging.info('Checking if cluster  %s exists', cluster_name)
     if cluster_exists(ontap_select, cluster_name):
-        stop_all_nodes(ontap_select, cluster_name, sleep_time)  # @TODO..check if node is powered on
-        cluster_offline(ontap_select, cluster_name, sleep_time)  # @TODO..add check if cluster offline
+        stop_all_nodes(ontap_select, cluster_name, sleep_time)
+        cluster_offline(ontap_select, cluster_name, sleep_time)
         cluster_delete(ontap_select, cluster_name, sleep_time)
     for host_id in host_ids:
         if host_exists(ontap_select, host_id):
@@ -346,6 +346,7 @@ def cluster_offline(ontap_select, cluster_name, sleep_time):
     :return: None
     '''
     logging.info('Making cluster %s offline', cluster_name)
+    # @TODO chheck if cluster is already offline
     ontap_select.offline_cluster(cluster_name, True)
     # wait for cluster to be offline
     logging.info('Waiting for Cluster offline to finish')
@@ -363,6 +364,8 @@ def cluster_offline(ontap_select, cluster_name, sleep_time):
                 state = cluster['state']
                 logging.info('State of cluster %s is %s', cluster_name, state)
                 if state == 'online':
+                    is_cluster_offline = False
+                if state == 'offline_in_progress':
                     is_cluster_offline = False
                 elif state == 'offline_failed':
                     logging.error('Offline  failed for Cluster %s', cluster_name)

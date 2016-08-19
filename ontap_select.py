@@ -131,15 +131,16 @@ class OntapSelect(object):
         nodes = []
         for node_name, node_config in node_configs.iteritems():
             host = node_config['host']
+            node_mgmt_ip = node_config['node_mgmt_ip']
             try:
                 mirror = node_config['mirror']
             except:
                 mirror = None
 
             if mirror:
-                node = {'host': host, 'name': node_name, 'mirror': mirror}
+                node = {'host': host, 'name': node_name, 'mirror': mirror, 'node_mgmt_ip':node_mgmt_ip }
             else:
-                node = {'host': host, 'name': node_name}
+                node = {'host': host, 'name': node_name, 'node_mgmt_ip':node_mgmt_ip}
 
             nodes.append(node)
         #fix boolean values
@@ -149,17 +150,15 @@ class OntapSelect(object):
         inhibit_rollback_bool = (inhibit_rollback_str.lower() == 'true')
 
         data = {'admin_password':cluster_config['admin_password'],
+                'cluster_mgmt_ip':cluster_config['cluster_mgmt_ip'],
                 'dns_info':
                     {'dns_ips': cluster_config['dns_ips'].split(','),
                      'domains': cluster_config['domains'].split(',')
                      },
                 'eval': eval_bool,
                 'inhibit_rollback': inhibit_rollback_bool,
-                'mgmt_ip_info':
-                    {'gateway': cluster_config['gateway'],
-                     'ip_addresses': cluster_config['ip_addresses'].split(','),
-                     'netmask': cluster_config['netmask']
-                     },
+                'gateway': cluster_config['gateway'],
+                'netmask': cluster_config['netmask'],
                 'name': cluster_config['name'],
                 'nodes': nodes,
                 'ntp_servers': cluster_config['ntp_servers'].split(',')

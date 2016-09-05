@@ -90,3 +90,6 @@ ENV/
 
 #pycharm
 .idea
+
+#ontap select conf file
+ontap_select.cfg

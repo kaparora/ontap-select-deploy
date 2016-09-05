@@ -103,8 +103,8 @@ class WebServicesClient(object):
             logging.debug('Delete Request Response: %s', r)
             print "delete request status" + str(r.status_code)
             if r.status_code == 204 or r.status_code == 202 :
-                logging.error('Delete request accpeted.')
-                print 'Error: delete request  accepted'
+                logging.info('Delete request accpeted.')
+                print 'delete request  accepted'
             else:
                 # @TODO throw error?
                 logging.error('Delete request rejected.')

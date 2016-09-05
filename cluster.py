@@ -26,6 +26,22 @@ from time import strftime
 
 
 def main():
+    operation = None
+    try:
+        operation = sys.argv[1]
+    except IndexError:
+        print 'This script needs an operation as argument.'
+
+    if operation == 'create' or operation == 'destroy' or operation == 'destroy:create':
+        logging.info('Requested operation is : %s', operation)
+    else:
+        if operation == None:
+            print 'No operation provided!'
+        elif operation != 'help':
+            print 'Invalid operation: ' + operation
+        print_help()
+        exit
+
     config = ConfigParser.ConfigParser()
     # reading config file ontap_select.cfg
     config.read(io.BytesIO('ontap_select.cfg'))
@@ -67,8 +83,8 @@ def main():
     # Instantiating OntapSelect class
     ontap_select = OntapSelect(default_config)
 
-    operation = default_config['operation']
-    logging.info('Requested operation is : %s', operation)
+    #operation = default_config['operation']
+
     cluster_name = cluster_config['name']
     logging.info('Cluster name is %s', cluster_name)
 
@@ -81,6 +97,18 @@ def main():
         destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time)
     else:
         logging.error('Unknown Operation %s , valid values : create, destroy and destroy:create', operation)
+
+
+def print_help():
+    print '###### HELP ######'
+    print 'Valid Operations:'
+    print '1. create - Creates a new cluster'
+    print '2. destroy - Destroy the cluster'
+    print '3. destroy:create - Destroy the cluster before creation'
+    print '###### Sample Commands ######'
+    print 'python cluster.py create'
+    print 'python cluster.py destroy'
+    print 'python cluster.py create:destroy'
 
 
 def create_cluster(cluster_config, host_configs, node_configs, ontap_select, sleep_time):

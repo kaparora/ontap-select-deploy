@@ -32,14 +32,17 @@ class OntapSelect(object):
     def get_hosts(self):
         return self._client.execute_get('hosts')
 
-    def delete_host(self, host_id):
+    def delete_host(self, host_id, force):
         '''
         Send delete host request
         :param host_id: str
         :return:
         '''
         service_path = 'hosts/' + host_id
-        self._client.execute_delete(service_path)
+        data = {'force': False}
+        if force:
+            data = {'force': True}
+        self._client.execute_delete(service_path, data)
 
     # def get_host(self, host_id):
     #     service_path = 'hosts/' + host_id
@@ -61,7 +64,7 @@ class OntapSelect(object):
         service_path = 'hosts/' + host_id + '/configuration'
         return self._client.execute_get(service_path)
 
-    def add_host_config(self, host_id, host_config):
+    def add_host_config(self, host_id, host_config, storage_pool_configs):
         '''
         Send add host config  request
         :param host_id: str
@@ -78,14 +81,25 @@ class OntapSelect(object):
         if data_net_vlan_id:
             data['data_network']['vlan_id'] = data_net_vlan_id
 
-        data['internal_network']['name'] = host_config['internal_net_name']
-        try:
-            internal_net_vlan_id = host_config['internal_net_vlan_id']
-        except:
-            internal_net_vlan_id = None
 
-        if internal_net_vlan_id:
-            data['internal_network']['vlan_id'] = internal_net_vlan_id
+        try:
+            internal_net_name = host_config['internal_net_name']
+        except:
+            internal_net_name = None
+
+        if internal_net_name:
+            data['internal_network']['name'] = internal_net_name
+            try:
+                internal_net_vlan_id = host_config['internal_net_vlan_id']
+            except:
+                internal_net_vlan_id = None
+
+            if internal_net_vlan_id:
+                data['internal_network']['vlan_id'] = internal_net_vlan_id
+        else:
+            #remove internal network if not set
+            data.pop('internal_network')
+
 
         data['mgmt_network']['name'] = host_config['mgmt_net_name']
 
@@ -99,21 +113,50 @@ class OntapSelect(object):
             data['mgmt_network']['vlan_id'] = mgmt_net_vlan_id
 
         data['location'] = host_config['location']
-        data['storage_pool'] = host_config['storage_pool']
+
+        storage_pool = []
+
+        storage_pools = host_config['storage_pool'].split(',')
+        for pool in storage_pools:
+            pool_config_dict = storage_pool_configs[pool]
+            name = pool_config_dict['name']
+            try:
+                capacity = pool_config_dict['capacity']
+            except:
+                capacity = None
+
+            if capacity:
+                pool_config = {'name': name, 'capacity': capacity}
+            else:
+                pool_config = {'name': name}
+
+            storage_pool.append(pool_config)
+
+        data['storage_pool'] = storage_pool
+
         try:
-            serial_number =  host_config['serial_number']
+            serial_number = host_config['serial_number']
         except:
             serial_number = None
         if serial_number:
             data['serial_number'] = serial_number
 
         try:
-            storage_pdisks = host_config['storage_pdisks']
+            instance_type = host_config['instance_type']
         except:
-            storage_pdisks = None
+            instance_type = None
 
-        if storage_pdisks:
-            data['storage_pdisks'] = storage_pdisks.split(',')
+        if instance_type:
+            data['storage_pdisks'] = instance_type
+
+        try:
+            eval_str = host_config['eval']
+        except:
+            eval_str = None
+
+        if eval_str:
+            eval_bool = (eval_str.lower() == 'true')
+            data['eval'] = eval_bool
 
         self._client.execute_put(service_path, data)
 
@@ -165,14 +208,17 @@ class OntapSelect(object):
                 }
         self._client.execute_post(service_path, data)
 
-    def delete_cluster(self, cluster_name):
+    def delete_cluster(self, cluster_name, force):
         '''
         Send Delete cluster request
         :param cluster_name: str
         :return: None
         '''
+        data = {'force': False}
+        if force:
+            data = {'force': True}
         service_path = 'clusters/' + cluster_name
-        self._client.execute_delete(service_path)
+        self._client.execute_delete(service_path, data)
 
     # def get_cluster(self, cluster_name):
     #     '''
@@ -192,7 +238,7 @@ class OntapSelect(object):
         service_path = 'clusters/' + cluster_name + '/nodes'
         return self._client.execute_get(service_path)
 
-    def stop_node(self, cluster_name, node_name):
+    def stop_node(self, cluster_name, node_name, force):
         '''
         send request to stop the cluster node
         :param cluster_name: str
@@ -200,7 +246,10 @@ class OntapSelect(object):
         :return:
         '''
         service_path = 'clusters/' + cluster_name + "/nodes/" + node_name + "/stop"
-        return self._client.execute_post(service_path, '')
+        data = {'force': False}
+        if force:
+            data = {'force': True}
+        return self._client.execute_post(service_path, data)
 
     def offline_cluster(self, cluster_name, force):
         '''

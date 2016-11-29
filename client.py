@@ -51,7 +51,12 @@ class WebServicesClient(object):
             self._close_session(session)
         else:
             # setting a dummy value
-            items = [{'name': 'select01', 'host': 'host01','status':'unknown', 'state': 'powered_on'}]
+            # @TODO use real config values for dummy output for no_execute
+            if 'nodes' in service_path:
+                items = [{'name': 'select-01','state': 'powered_on'}]
+            else:
+                items = {'clusters':[{'name': 'select', 'host': 'host01','status':'unknown', 'state': 'powered_on'}],
+                     'hosts': [{'name': 'select01', 'host': 'cbc-esx-sdot.muccbc.hq.netapp.com', 'status': 'unknown', 'state': 'powered_on'}]}
         return items
 
     def execute_post(self, service_path, data):
@@ -92,13 +97,15 @@ class WebServicesClient(object):
                 logging.info('Request accepted.')
             self._close_session(session)
 
-    def execute_delete(self, service_path):
+    def execute_delete(self, service_path, data):
         delete_url = self._url + service_path
-        print "Executing Delete Request with url : " + delete_url
-        logging.info('Executing REST API DELETE Request with url: %s', delete_url)
+        print "Executing Delete Request with url : " + delete_url + "with data:" + data
+        logging.info('Executing REST API DELETE Request with url: %s with data: %s', delete_url, data)
         if not self._no_execute:
-            session = self._create_session()
-            r = session.delete(delete_url)
+            #session = self._create_session()
+            headers = {'content-type': 'application/json'}
+            r = requests.delete(delete_url, auth=(self._username, self._password), headers=headers, verify=False, json=data)
+            #r = session.delete(delete_url)
             logging.info('Response status code is  %s', r.status_code)
             logging.debug('Delete Request Response: %s', r)
             print "delete request status" + str(r.status_code)
@@ -107,6 +114,8 @@ class WebServicesClient(object):
                 print 'delete request  accepted'
             else:
                 # @TODO throw error?
-                logging.error('Delete request rejected.')
-                print 'Error: delete request not accepted'
-            self._close_session(session)
+                print r._content
+                exit(0)
+                logging.info('Delete request rejected.')
+                print 'Info: delete request not accepted'
+            #self._close_session(session)

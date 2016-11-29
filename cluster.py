@@ -26,6 +26,19 @@ from time import strftime
 
 
 def main():
+    config = ConfigParser.ConfigParser()
+    # reading config file ontap_select.cfg
+    config.read(io.BytesIO('ontap_select.cfg'))
+
+    default_config = dict(config.items('default'))
+
+    # getting log level from the config file
+    log_level = default_config['log_level']
+    level = _get_Log_level(log_level)
+    # initializing logger
+    log_filename = strftime("ontap_select_%Y%m%d%H%M%S.log")
+    logging.basicConfig(filename=log_filename,
+                        level=level, format='%(asctime)s - %(levelname)s - %(message)s')
     operation = None
     try:
         operation = sys.argv[1]
@@ -42,38 +55,42 @@ def main():
         print_help()
         exit
 
-    config = ConfigParser.ConfigParser()
-    # reading config file ontap_select.cfg
-    config.read(io.BytesIO('ontap_select.cfg'))
 
-    default_config = dict(config.items('default'))
     cluster_config = dict(config.items('cluster'))
     host_ids_str = default_config['hosts']
     host_ids = host_ids_str.split(',')
     host_configs = {}
     for host_id in host_ids:
         host_configs[host_id] = dict(config.items(host_id))
+
+    storage_pool_configs = {}
+    for host_id, host_config in host_configs.iteritems():
+        storage_pools = host_config['storage_pool'].split(',')
+        for storage_pool in storage_pools:
+            storage_pool_configs[storage_pool] = dict(config.items(storage_pool))
+
     node_name_str = cluster_config['nodes']
     node_names = node_name_str.split(',')
     node_configs = {}
     for node_name in node_names:
         node_configs[node_name] = dict(config.items(node_name))
-    # getting log level from the config file
-    log_level = default_config['log_level']
-    level = _get_Log_level(log_level)
 
-    # initializing logger
-    logging.basicConfig(filename=strftime("ontap_select_%Y%m%d%H%M%S.log"),
-                        level=level, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+
     # @TODO change no-execute to env variable
     # no-execute? checking if no_execute is set. We won't execute any apis..just list the operations
     no_execute_str = default_config['no_execute']
+    if no_execute_str.lower() == 'true':
+        no_execute = True
+    else:
+        no_execute = False
 
     sleep_time = int(default_config['sleep_time_in_seconds_for_status_checks'])
     logging.debug('Configured sleep time for status checks is %s', sleep_time)
 
     logging.info('no_execute is set to %s', no_execute_str)
-    if no_execute_str.lower() == 'true':
+    if no_execute:
         logging.info('This is a dry run, No APIs will be executed.')
 
     logging.info('ONTAP Management VM IP:user/pass %s:%s/**** and with API version %s will be used',
@@ -87,14 +104,15 @@ def main():
 
     cluster_name = cluster_config['name']
     logging.info('Cluster name is %s', cluster_name)
+    force = True
 
     if operation == 'create':
-        create_cluster(cluster_config, host_configs, node_configs, ontap_select, sleep_time)
+        create_cluster(cluster_config, host_configs, storage_pool_configs, node_configs, ontap_select, sleep_time)
     elif operation == 'destroy:create':
-        destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time)
-        create_cluster(cluster_config, host_configs, node_configs, ontap_select, sleep_time)
+        destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time, no_execute, force)
+        create_cluster(cluster_config, host_configs, storage_pool_configs, node_configs, ontap_select, sleep_time)
     elif operation == 'destroy':
-        destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time)
+        destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time, no_execute, force)
     else:
         logging.error('Unknown Operation %s , valid values : create, destroy and destroy:create', operation)
 
@@ -111,7 +129,7 @@ def print_help():
     print 'python cluster.py create:destroy'
 
 
-def create_cluster(cluster_config, host_configs, node_configs, ontap_select, sleep_time):
+def create_cluster(cluster_config, host_configs, storage_pool_configs, node_configs, ontap_select, sleep_time):
     '''
 
     :param cluster_config: dict of cluster config params
@@ -123,11 +141,11 @@ def create_cluster(cluster_config, host_configs, node_configs, ontap_select, sle
     '''
     logging.info('Starting ONTAP Select Cluster Deployment')
     add_hosts(host_configs, ontap_select, sleep_time)
-    configure_hosts(host_configs, ontap_select, sleep_time)
+    configure_hosts(host_configs, storage_pool_configs, ontap_select, sleep_time)
     add_cluster(cluster_config, node_configs, ontap_select, sleep_time)
 
 
-def destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time):
+def destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time, no_execute, force):
     '''
 
     :param ontap_select: OntapSelect class obj
@@ -138,12 +156,14 @@ def destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time):
     '''
     logging.info('Checking if cluster  %s exists', cluster_name)
     if cluster_exists(ontap_select, cluster_name):
-        stop_all_nodes(ontap_select, cluster_name, sleep_time)
-        cluster_offline(ontap_select, cluster_name, sleep_time)
-        cluster_delete(ontap_select, cluster_name, sleep_time)
+        stop_all_nodes(ontap_select, cluster_name, sleep_time, force)
+        cluster_offline(ontap_select, cluster_name, sleep_time, force)
+        cluster_delete(ontap_select, cluster_name, sleep_time, no_execute)
     for host_id in host_ids:
         if host_exists(ontap_select, host_id):
-            delete_host(ontap_select, host_id, sleep_time)
+            delete_host(ontap_select, host_id, sleep_time, True, no_execute)
+    logging.info('Cluster %s destroy workflow completed!', cluster_name)
+    print "Cluster destroy workflow completed.!"
 
 
 def add_hosts(host_configs, ontap_select, sleep_time):
@@ -168,8 +188,10 @@ def add_hosts(host_configs, ontap_select, sleep_time):
         time.sleep(sleep_time)
         all_hosts_authenticated = True
         logging.info('Getting Status for all hosts.')
-        hosts = ontap_select.get_hosts()
+        output_hosts = ontap_select.get_hosts()
+        hosts = output_hosts['hosts']
         logging.debug('Get hosts result %s', hosts)
+        print hosts
         for host in hosts:
             status = host['status']
             logging.info('Status of Host %s is %s', host['host'], status)
@@ -182,7 +204,7 @@ def add_hosts(host_configs, ontap_select, sleep_time):
     logging.info('All Hosts have been added and authenticated')
 
 
-def configure_hosts(host_configs, ontap_select, sleep_time):
+def configure_hosts(host_configs, storage_pool_configs, ontap_select, sleep_time):
     '''
     :param host_configs: dict of host config params
     :param ontap_select: OntapSelect class object
@@ -195,7 +217,8 @@ def configure_hosts(host_configs, ontap_select, sleep_time):
         # Send configure Host request
         logging.debug('Host Configuration: %s', host_config)
         logging.info('Sending add configuration request for host %s', host_id)
-        ontap_select.add_host_config(host_id, host_config)
+
+        ontap_select.add_host_config(host_id, host_config, storage_pool_configs)
 
     # wait for hosts to be configured
     logging.info('Wait for host configurations to complete')
@@ -206,7 +229,8 @@ def configure_hosts(host_configs, ontap_select, sleep_time):
         time.sleep(sleep_time)
         all_hosts_configured = True
         logging.info('Sending request to get status of all hosts')
-        hosts = ontap_select.get_hosts()
+        output_hosts = ontap_select.get_hosts()
+        hosts = output_hosts['hosts']
         logging.debug('Status result for all hosts: %s', hosts)
         for host in hosts:
             status = host['status']
@@ -241,10 +265,11 @@ def add_cluster(cluster_config, node_configs, ontap_select, sleep_time):
         time.sleep(sleep_time)
         cluster_online = True
         logging.info('Requesting status of all clusters')
-        clusters = ontap_select.get_clusters()
+        output_clusters = ontap_select.get_clusters()
+        clusters = output_clusters['clusters']
         # if cluster create fails, the cluster disappears. Hence we need to check if clusters list is empty
         if len(clusters) < 1:
-            logging.error('Cluster creation failed, cluster %s does not exist.', cluster_name)
+            logging.error('Cluster creation failed, cluster %s does not exist.', cluster_config['name'])
         for cluster in clusters:
             cluster_name = cluster['name']
             logging.debug('Cluster name: %s', cluster_name)
@@ -269,7 +294,7 @@ def add_cluster(cluster_config, node_configs, ontap_select, sleep_time):
                     logging.error('Creation failed for Cluster %s', cluster_name)
                     logging.error('Stopping Execution, check cluster configuration options.')
                     sys.exit('Creation failed for  cluster ' + cluster_name)
-    # logging.info('Cluster %s successfully created and is online', name)
+    logging.info('Cluster %s creation workflow completed!', cluster_name)
     print "Cluster creation workflow completed.!"
 
 
@@ -280,7 +305,8 @@ def cluster_exists(ontap_select, cluster_name):
     :return: None
     '''
     logging.info('Getting List of Clusters.')
-    clusters = ontap_select.get_clusters()
+    clusters_output = ontap_select.get_clusters()
+    clusters = clusters_output['clusters']
     logging.debug('Cluster get result %s', clusters)
     for cluster in clusters:
 
@@ -299,7 +325,8 @@ def host_exists(ontap_select, host_id):
     :return:
     '''
     logging.info('Getting List of Hosts.')
-    hosts = ontap_select.get_hosts()
+    output_hosts = ontap_select.get_hosts()
+    hosts = output_hosts['hosts']
     logging.debug('Hosts get result %s', hosts)
     for host in hosts:
 
@@ -310,7 +337,7 @@ def host_exists(ontap_select, host_id):
     return False
 
 
-def delete_host(ontap_select, host_id, sleep_time):
+def delete_host(ontap_select, host_id, sleep_time, force, no_execute):
     '''
 
     :param ontap_select: OntapSelect class object
@@ -319,13 +346,17 @@ def delete_host(ontap_select, host_id, sleep_time):
     :return:
     '''
     logging.info('Deleting Hosts %s', host_id)
-    hosts = ontap_select.delete_host(host_id)
-    while host_exists(ontap_select, host_id):
-        logging.info('Sleeping for %s seconds before next status check.', sleep_time)
-        time.sleep(sleep_time)
+    hosts = ontap_select.delete_host(host_id, force)
+    if no_execute:
+        print "Not waiting for deletion to complete as not real execution"
+    else:#waiting for deletion to complete
+        while host_exists(ontap_select, host_id):
+            logging.info('Sleeping for %s seconds before next status check.', sleep_time)
+            time.sleep(sleep_time)
 
 
-def stop_all_nodes(ontap_select, cluster_name, sleep_time):
+
+def stop_all_nodes(ontap_select, cluster_name, sleep_time, force):
     '''
 
     :param ontap_select: OntapSelect class object
@@ -342,7 +373,7 @@ def stop_all_nodes(ontap_select, cluster_name, sleep_time):
         if (node_state == 'powered_on' or node_state == 'powering_off_failed' or
                     node_state == 'powering_on' or node_state == 'suspended'):
             logging.info('Sending request to stop node %s', node_name)
-            ontap_select.stop_node(cluster_name, node_name)
+            ontap_select.stop_node(cluster_name, node_name, force)
 
     logging.info('Wait for all nodes to stop')
     all_nodes_stopped = False
@@ -365,7 +396,7 @@ def stop_all_nodes(ontap_select, cluster_name, sleep_time):
                 sys.exit('Powering off failed for  node ' + node_name)
 
 
-def cluster_offline(ontap_select, cluster_name, sleep_time):
+def cluster_offline(ontap_select, cluster_name, sleep_time, force):
     '''
 
     :param ontap_select: OntapSelect class object
@@ -375,7 +406,7 @@ def cluster_offline(ontap_select, cluster_name, sleep_time):
     '''
     logging.info('Making cluster %s offline', cluster_name)
     # @TODO chheck if cluster is already offline
-    ontap_select.offline_cluster(cluster_name, True)
+    ontap_select.offline_cluster(cluster_name, force)
     # wait for cluster to be offline
     logging.info('Waiting for Cluster offline to finish')
     is_cluster_offline = False
@@ -384,7 +415,8 @@ def cluster_offline(ontap_select, cluster_name, sleep_time):
         time.sleep(sleep_time)
         is_cluster_offline = True
         logging.info('Requesting status of all clusters')
-        clusters = ontap_select.get_clusters()
+        output_clusters = ontap_select.get_clusters()
+        clusters = output_clusters['clusters']
         for cluster in clusters:
             name = cluster['name']
             logging.debug('Cluster name: %s', cluster_name)
@@ -402,7 +434,7 @@ def cluster_offline(ontap_select, cluster_name, sleep_time):
     logging.info('Cluster %s successfully offlined ', name)
 
 
-def cluster_delete(ontap_select, cluster_name, sleep_time):
+def cluster_delete(ontap_select, cluster_name, sleep_time, no_execute):
     '''
 
     :param ontap_select: OntapSelect class object
@@ -411,11 +443,15 @@ def cluster_delete(ontap_select, cluster_name, sleep_time):
     :return: None
     '''
     logging.info('Deleting cluster %s ', cluster_name)
-    ontap_select.delete_cluster(cluster_name)
+    ontap_select.delete_cluster(cluster_name, True)
     logging.info('Waiting for Cluster deletion to finish')
-    while cluster_exists(ontap_select, cluster_name):
-        logging.info('Sleeping for %s seconds before next status check.', sleep_time)
-        time.sleep(sleep_time)
+    if no_execute:
+        print "Not waiting for deletion to complete"
+    else:#wait for cluster to delete
+        while cluster_exists(ontap_select, cluster_name):
+            logging.info('Sleeping for %s seconds before next status check.', sleep_time)
+            time.sleep(sleep_time)
+
 
 
 def _get_Log_level(log_level):

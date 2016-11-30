@@ -39,9 +39,7 @@ class OntapSelect(object):
         :return:
         '''
         service_path = 'hosts/' + host_id
-        data = {'force': False}
-        if force:
-            data = {'force': True}
+        data = get_force_data(force)
         self._client.execute_delete(service_path, data)
 
     # def get_host(self, host_id):
@@ -147,7 +145,7 @@ class OntapSelect(object):
             instance_type = None
 
         if instance_type:
-            data['storage_pdisks'] = instance_type
+            data['instance_type'] = instance_type
 
         try:
             eval_str = host_config['eval']
@@ -214,9 +212,7 @@ class OntapSelect(object):
         :param cluster_name: str
         :return: None
         '''
-        data = {'force': False}
-        if force:
-            data = {'force': True}
+        data = get_force_data(force)
         service_path = 'clusters/' + cluster_name
         self._client.execute_delete(service_path, data)
 
@@ -246,9 +242,7 @@ class OntapSelect(object):
         :return:
         '''
         service_path = 'clusters/' + cluster_name + "/nodes/" + node_name + "/stop"
-        data = {'force': False}
-        if force:
-            data = {'force': True}
+        data = get_force_data(force)
         return self._client.execute_post(service_path, data)
 
     def offline_cluster(self, cluster_name, force):
@@ -259,8 +253,13 @@ class OntapSelect(object):
         :return:
         '''
         service_path = 'clusters/' + cluster_name + "/offline"
-        data = {'force': False}
-        if force:
-            data = {'force': True}
+        data = get_force_data(force)
 
         return self._client.execute_post(service_path, data)
+
+def get_force_data(force):
+    data = {'force': False}
+    if force:
+        data = {'force': True}
+    return data
+

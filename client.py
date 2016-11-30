@@ -99,7 +99,7 @@ class WebServicesClient(object):
 
     def execute_delete(self, service_path, data):
         delete_url = self._url + service_path
-        print "Executing Delete Request with url : " + delete_url + "with data:" + data
+        print "Executing Delete Request with url : " + delete_url + "with data:" + str(data)
         logging.info('Executing REST API DELETE Request with url: %s with data: %s', delete_url, data)
         if not self._no_execute:
             #session = self._create_session()

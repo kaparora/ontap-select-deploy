@@ -55,7 +55,6 @@ def main():
         print_help()
         exit
 
-
     cluster_config = dict(config.items('cluster'))
     host_ids_str = default_config['hosts']
     host_ids = host_ids_str.split(',')
@@ -75,8 +74,10 @@ def main():
     for node_name in node_names:
         node_configs[node_name] = dict(config.items(node_name))
 
-
-
+    force = False
+    force_str = default_config['force']
+    if force_str.lower() == 'true':
+        force = True
 
     # @TODO change no-execute to env variable
     # no-execute? checking if no_execute is set. We won't execute any apis..just list the operations
@@ -104,7 +105,6 @@ def main():
 
     cluster_name = cluster_config['name']
     logging.info('Cluster name is %s', cluster_name)
-    force = True
 
     if operation == 'create':
         create_cluster(cluster_config, host_configs, storage_pool_configs, node_configs, ontap_select, sleep_time)
@@ -158,7 +158,7 @@ def destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time, no_execute
     if cluster_exists(ontap_select, cluster_name):
         stop_all_nodes(ontap_select, cluster_name, sleep_time, force)
         cluster_offline(ontap_select, cluster_name, sleep_time, force)
-        cluster_delete(ontap_select, cluster_name, sleep_time, no_execute)
+        cluster_delete(ontap_select, cluster_name, sleep_time, no_execute, force)
     for host_id in host_ids:
         if host_exists(ontap_select, host_id):
             delete_host(ontap_select, host_id, sleep_time, True, no_execute)
@@ -434,7 +434,7 @@ def cluster_offline(ontap_select, cluster_name, sleep_time, force):
     logging.info('Cluster %s successfully offlined ', name)
 
 
-def cluster_delete(ontap_select, cluster_name, sleep_time, no_execute):
+def cluster_delete(ontap_select, cluster_name, sleep_time, no_execute, force):
     '''
 
     :param ontap_select: OntapSelect class object
@@ -443,7 +443,7 @@ def cluster_delete(ontap_select, cluster_name, sleep_time, no_execute):
     :return: None
     '''
     logging.info('Deleting cluster %s ', cluster_name)
-    ontap_select.delete_cluster(cluster_name, True)
+    ontap_select.delete_cluster(cluster_name, force)
     logging.info('Waiting for Cluster deletion to finish')
     if no_execute:
         print "Not waiting for deletion to complete"

@@ -4,7 +4,11 @@ This program talks to the NetApp ONTAP Select Install VM using REST API and depl
 
 ## Step1:
 * Create your config file by copying the sample:
- * >mv ontap_select_sample.cfg ontap_select.cfg
+ * For 1 node Cluster
+   * >mv ontap_select_sample.cfg ontap_select.cfg
+ * For 4 node cluster
+   * >mv ontap_select_sample_4node.cfg ontap_select.cfg 
+ 
 * Edit the config file ontap_select.cfg to setup your deployment config
 
 ## Step 2:

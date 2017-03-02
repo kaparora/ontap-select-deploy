@@ -32,6 +32,11 @@ class OntapSelect(object):
     def get_hosts(self):
         return self._client.execute_get('hosts')
 
+    def get_host(self, host_id):
+        service_path = 'hosts/' + host_id
+        return self._client.execute_get(service_path)
+
+
     def delete_host(self, host_id, force):
         '''
         Send delete host request
@@ -70,7 +75,9 @@ class OntapSelect(object):
         :return: None
         '''
         service_path = 'hosts/' + host_id + '/configuration'
+
         data = {'data_network':{},'internal_network':{}, 'mgmt_network':{}}
+
         data['data_network']['name'] = host_config['data_net_name']
         try:
             data_net_vlan_id = host_config['data_net_vlan_id']

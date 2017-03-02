@@ -156,7 +156,7 @@ def destroy_cluster(ontap_select, cluster_name, host_ids, sleep_time, no_execute
     '''
     logging.info('Checking if cluster  %s exists', cluster_name)
     if cluster_exists(ontap_select, cluster_name):
-        stop_all_nodes(ontap_select, cluster_name, sleep_time, force)
+        #stop_all_nodes(ontap_select, cluster_name, sleep_time, force)
         cluster_offline(ontap_select, cluster_name, sleep_time, force)
         cluster_delete(ontap_select, cluster_name, sleep_time, no_execute, force)
     for host_id in host_ids:
@@ -178,30 +178,27 @@ def add_hosts(host_configs, ontap_select, sleep_time):
     for host_id, host_config in host_configs.iteritems():
         logging.info('Adding host %s with username/password: %s/***** and vcenter: %s',
                      host_id, host_config['username'], host_config['vcenter'])
-        # Seding host add request
+        # Sending host add request
         ontap_select.add_host(host_id, host_config)
-    # Wait for hosts to be added
-    logging.info('Waiting for Hosts to be added and authenticated.')
-    all_hosts_authenticated = False
-    while not all_hosts_authenticated:
-        logging.info('Sleeping for %s seconds before next status check.', sleep_time)
-        time.sleep(sleep_time)
-        all_hosts_authenticated = True
-        logging.info('Getting Status for all hosts.')
-        output_hosts = ontap_select.get_hosts()
-        hosts = output_hosts['hosts']
-        logging.debug('Get hosts result %s', hosts)
-        print hosts
-        for host in hosts:
-            status = host['status']
-            logging.info('Status of Host %s is %s', host['host'], status)
-            if status == 'authentication_in_progress':
-                all_hosts_authenticated = False
-            elif status == 'authentication_failed':
-                logging.error('Authentication failed for Host %s', host['host'])
+        logging.info('Waiting for host %s to be added and authenticated.',host_id)
+        #Wait for host to be added
+        host_authenticated = False
+        while not host_authenticated:
+            logging.info('Sleeping for %s seconds before next status check.', sleep_time)
+            time.sleep(sleep_time)
+            host_authenticated = True
+            logging.info('Getting Status for  host %s.',host_id)
+            output_host = ontap_select.get_host(host_id)
+            status = output_host['status']
+            logging.info('Status of Host %s is %s', host_id, status)
+            if status == "authentication_in_progress":
+                host_authenticated = False
+            elif status == "authentication_failed":
+                logging.error('Authentication failed for Host %s', host_id)
                 logging.error('Stopping Execution, check host credentials')
-                sys.exit('Authentication failed for  host ' + host['host'])
-    logging.info('All Hosts have been added and authenticated')
+                sys.exit('Authentication failed for  host ' + host_id)
+            logging.debug('Get host result %s', output_host)
+        logging.info('Host %s has been added and authenticated',host_id)
 
 
 def configure_hosts(host_configs, storage_pool_configs, ontap_select, sleep_time):
@@ -219,28 +216,24 @@ def configure_hosts(host_configs, storage_pool_configs, ontap_select, sleep_time
         logging.info('Sending add configuration request for host %s', host_id)
 
         ontap_select.add_host_config(host_id, host_config, storage_pool_configs)
-
-    # wait for hosts to be configured
-    logging.info('Wait for host configurations to complete')
-    all_hosts_configured = False
-    # @TODO wait for only newly configured hosts
-    while not all_hosts_configured:
-        logging.info('Sleeping for %s seconds before next status check.', sleep_time)
-        time.sleep(sleep_time)
-        all_hosts_configured = True
-        logging.info('Sending request to get status of all hosts')
-        output_hosts = ontap_select.get_hosts()
-        hosts = output_hosts['hosts']
-        logging.debug('Status result for all hosts: %s', hosts)
-        for host in hosts:
-            status = host['status']
-            logging.info('Status of Host %s is %s', host['host'], status)
+        # wait for hosts to be configured
+        logging.info('Wait for configuration of host %s to complete',host_id)
+        host_configured = False
+        while not host_configured:
+            logging.info('Sleeping for %s seconds before next status check.', sleep_time)
+            time.sleep(sleep_time)
+            host_configured = True
+            logging.info('Sending request to get status of host %s', host_id)
+            output_host = ontap_select.get_host(host_id)
+            logging.debug('Status result for host: %s', host_id)
+            status = output_host['status']
+            logging.info('Status of Host %s is %s', host_id, status)
             if status == 'configuration_in_progress':
-                all_hosts_configured = False
+                host_configured = False
             elif status == 'configuration_failed':
-                logging.error('Configuration failed for Host %s', host['host'])
+                logging.error('Configuration failed for Host %s', host_id)
                 logging.error('Stopping Execution, check host configuration options.')
-                sys.exit('Configuration failed for  host ' + host['host'])
+                sys.exit('Configuration failed for  host ' + host_id)
 
 
 def add_cluster(cluster_config, node_configs, ontap_select, sleep_time):
@@ -374,26 +367,28 @@ def stop_all_nodes(ontap_select, cluster_name, sleep_time, force):
                     node_state == 'powering_on' or node_state == 'suspended'):
             logging.info('Sending request to stop node %s', node_name)
             ontap_select.stop_node(cluster_name, node_name, force)
+            logging.info('Wait for all nodes to stop')
+            node_stopped = False
+            logging.info('Wait for node %s to stop', node_name)
+            while not node_stopped:
+                logging.info('Sleeping for %s seconds before next status check.', sleep_time)
+                time.sleep(sleep_time)
+                node_stopped = True
+                logging.info('Sending request to get status of node %s', node_name)
+                nodes = ontap_select.get_cluster_nodes(cluster_name)
+                logging.debug('Status result for all nodes: %s', nodes)
+                for node in nodes:
+                    name = node['name']
+                    if node_name == name:
+                        node_state = node['state']
+                        logging.info('State of Node %s is %s', node_name, node_state)
+                        if node_state == 'powering_off':
+                            node_stopped = False
+                        elif node_state == 'powering_off_failed':
+                            logging.error('Powering failed for Node %s', node_name)
+                            logging.error('Stopping Execution, check vmware env')
+                            sys.exit('Powering off failed for  node ' + node_name)
 
-    logging.info('Wait for all nodes to stop')
-    all_nodes_stopped = False
-    while not all_nodes_stopped:
-        logging.info('Sleeping for %s seconds before next status check.', sleep_time)
-        time.sleep(sleep_time)
-        all_nodes_stopped = True
-        logging.info('Sending request to get status of all nodes')
-        nodes = ontap_select.get_cluster_nodes(cluster_name)
-        logging.debug('Status result for all nodes: %s', nodes)
-        for node in nodes:
-            node_name = node['name']
-            node_state = node['state']
-            logging.info('State of Node %s is %s', node_name, node_state)
-            if node_state == 'powering_off':
-                all_nodes_stopped = False
-            elif node_state == 'powering_off_failed':
-                logging.error('Powering failed for Node %s', node_name)
-                logging.error('Stopping Execution, check vmware env')
-                sys.exit('Powering off failed for  node ' + node_name)
 
 
 def cluster_offline(ontap_select, cluster_name, sleep_time, force):
@@ -405,12 +400,12 @@ def cluster_offline(ontap_select, cluster_name, sleep_time, force):
     :return: None
     '''
     logging.info('Making cluster %s offline', cluster_name)
-    # @TODO chheck if cluster is already offline
+    # @TODO check if cluster is already offline
     ontap_select.offline_cluster(cluster_name, force)
     # wait for cluster to be offline
     logging.info('Waiting for Cluster offline to finish')
     is_cluster_offline = False
-    while is_cluster_offline == False:
+    while not is_cluster_offline:
         logging.info('Sleeping for %s seconds before next status check.', sleep_time)
         time.sleep(sleep_time)
         is_cluster_offline = True

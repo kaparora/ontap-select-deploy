@@ -23,6 +23,9 @@ This script take 1 argument and i.e. operation. There are 4 possible operation v
  * >python cluster.py destroy:create
 * Display Help
  * >python cluster.py help
+* Providing your own config file name instead of the default ontap_select.cfg
+ * >python cluster.py <operation> <config_file_name>
+ * e.g. >python cluster.py create /path/to/select1.cfg
 
 
 ## Notes:

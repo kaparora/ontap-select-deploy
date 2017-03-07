@@ -14,7 +14,7 @@ This program talks to the NetApp ONTAP Select Install VM using REST API and depl
 ## Step 2:
 Execute cluster.py
 
-This script take 1 argument and i.e. operation. There are 4 possible operation values, as follows: 
+This script take 2 arguments i.e. operation and config file name. There are 4 possible operation values, as follows: 
 * Create cluster
  * >python cluster.py create
 * Destroy cluster

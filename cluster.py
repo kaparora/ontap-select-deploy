@@ -22,13 +22,28 @@ import io
 import time
 import sys
 import logging
+import os.path
 from time import strftime
 
 
 def main():
+    config_file_name = 'ontap_select.cfg'
+    try:
+        config_file_name = sys.argv[2]
+        print 'This script will use the following config file for execution:'
+        print config_file_name
+    except IndexError:
+        print 'No config name provided, using the default name ontap_select.cfg '
+
+    #check if config file exist
+    if not os.path.isfile(config_file_name):
+        print 'Error: Config file does not exist!'
+        sys.exit('Config file does not exist!')
+
+
     config = ConfigParser.ConfigParser()
     # reading config file ontap_select.cfg
-    config.read(io.BytesIO('ontap_select.cfg'))
+    config.read(io.BytesIO(config_file_name))
 
     default_config = dict(config.items('default'))
 
@@ -40,6 +55,7 @@ def main():
     logging.basicConfig(filename=log_filename,
                         level=level, format='%(asctime)s - %(levelname)s - %(message)s')
     operation = None
+
     try:
         operation = sys.argv[1]
     except IndexError:
@@ -123,10 +139,16 @@ def print_help():
     print '1. create - Creates a new cluster'
     print '2. destroy - Destroy the cluster'
     print '3. destroy:create - Destroy the cluster before creation'
-    print '###### Sample Commands ######'
+    print '###### Sample commands ######'
     print 'python cluster.py create'
     print 'python cluster.py destroy'
     print 'python cluster.py create:destroy'
+    print ''
+    print 'You can also provide a custom config file name as the second parameter, default is ontap_select.cfg'
+    print '###### Sample commands with config file name ######'
+    print 'python cluster.py create /path/to/select_config1.cfg'
+    print 'python cluster.py destroy /path/to/select_config1.cfg'
+    print 'python cluster.py create:destroy /path/to/select_config1.cfg'
 
 
 def create_cluster(cluster_config, host_configs, storage_pool_configs, node_configs, ontap_select, sleep_time):
@@ -310,6 +332,8 @@ def cluster_exists(ontap_select, cluster_name):
     return False
 
 
+
+
 def host_exists(ontap_select, host_id):
     '''
 
@@ -442,8 +466,12 @@ def cluster_delete(ontap_select, cluster_name, sleep_time, no_execute, force):
     logging.info('Waiting for Cluster deletion to finish')
     if no_execute:
         print "Not waiting for deletion to complete"
-    else:#wait for cluster to delete
+    else: #wait for cluster to delete
         while cluster_exists(ontap_select, cluster_name):
+            cluster = ontap_select.get_cluster(cluster_name)
+            cluster_state = cluster['state']
+            if cluster_state == 'delete_failed':
+                sys.exit('Delete failed for cluster  ' + cluster_name)
             logging.info('Sleeping for %s seconds before next status check.', sleep_time)
             time.sleep(sleep_time)
 

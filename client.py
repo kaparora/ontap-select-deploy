@@ -55,7 +55,7 @@ class WebServicesClient(object):
             if 'nodes' in service_path:
                 items = [{'name': 'select-01','state': 'powered_on'}]
             else:
-                items = {'clusters':[{'name': 'select', 'host': 'host01','status':'unknown', 'state': 'powered_on'}],
+                items = {'status': 'unknown','clusters':[{'name': 'select', 'host': 'host01','status':'unknown', 'state': 'powered_on'}],
                      'hosts': [{'name': 'select01', 'host': 'cbc-esx-sdot.muccbc.hq.netapp.com', 'status': 'unknown', 'state': 'powered_on'}]}
         return items
 

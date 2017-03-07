@@ -168,6 +168,17 @@ class OntapSelect(object):
     def get_clusters(self):
         return self._client.execute_get('clusters')
 
+    def get_cluster(self, cluster_name):
+        '''
+        Gets the cluster info
+        :type cluster_name: str
+        :param cluster_name: str
+        :return: cluster details
+        '''
+        service_path = 'clusters/' + cluster_name
+        return self._client.execute_get(service_path)
+
+
     def add_cluster(self, cluster_config, node_configs):
         '''
         Send add cluster request. With the expected data structure.

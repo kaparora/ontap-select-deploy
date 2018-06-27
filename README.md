@@ -1,3 +1,6 @@
+
+### Note: This Script doesn't work with ONTAP Deploy tool v2.8 and beyond.</span>
+
 # ontap-select-deploy
 This program talks to the NetApp ONTAP Select Deploy VM using REST API and deploys a new ONTAP Cluster.
 You can use this script to deploy 1,2 or 4 node ONTAP select clutser.
